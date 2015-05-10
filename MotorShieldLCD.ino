@@ -7,18 +7,35 @@ boolean Reset = false, Stop = false, Paused = false;
 volatile boolean timeFlag = false;
 boolean restart=false;
 
+int buttonPinHourPlus = 37;
+int buttonPinHourMinus = 36;
+int buttonStartMotorA=28;
+int buttonStartMotorB=26;
+
 //time for watering
-int secondsForWatering = 5;
-int vectorSize = 2;
+int vectorSize = 3;
+/**
 int P1hoursTimer[] = {24, 24, 24};
 int P1minutesTimer[] = {0, 0, 0};
 int P1secondsTimer[] = {0, 0, 0};
 int P1wateringDuration[] = {12,12,12};
+**/
+
+/**TEST **/
+int P1hoursTimer[] = {0, 0, 0};
+int P1minutesTimer[] = {0, 0, 0};
+int P1secondsTimer[] = {50,50,50};
+int P1wateringDuration[] = {20,20,20};
+
+// 0:both - 1:first - 2:second
+String P1whoWorks[] = {"A,B","A","B"};
+/***/
 
 int P2hoursTimer[] = {48, 48, 48};
 int P2minutesTimer[] = {0, 0, 0};
 int P2secondsTimer[] = {0, 0, 0};
-int P2wateringDuration[] = {15,15,15};
+int P2wateringDuration[] = {20,20,20};
+String P2whoWorks[] = {"A,B","A,B","A,B"};
 
 int programActive = 2;
 
@@ -26,7 +43,7 @@ int programActive = 2;
 int index = 0;
 boolean isWatering = false;
 
-LiquidCrystal lcd(12, 11, 5, 4, 6, 2);
+LiquidCrystal lcd(30, 31, 5, 4, 6, 2);
 
 int HourPlusButtonState = 0; 
 int HourMinusButtonState = 0; 
@@ -40,6 +57,13 @@ Brake	        Digital 9	Digital 8
 Current Sensing	Analog 0	Analog 1
 */
 
+int directionMotorA=12;
+int speedMotorA=3;
+int brakeMotorA=9;
+int directionMotorB=13;
+int speedMotorB=11;
+int brakeMotorB=8;
+
 void setup()
 {
   Serial.begin(9600);
@@ -48,15 +72,32 @@ void setup()
   initializeMotors();
 }
 
+void controlMotors(){
+  int statusMotorA = digitalRead(buttonStartMotorA);
+  int statusMotorB = digitalRead(buttonStartMotorB);
+  Serial.println("status A: ");
+  Serial.println(statusMotorA);
+  Serial.println("status B: ");
+  Serial.println(statusMotorB);
+  if(statusMotorA==HIGH){
+    analogWrite(speedMotorA, 255);
+  }
+  if(statusMotorB==HIGH){
+    analogWrite(speedMotorB, 255);
+  }
+}
+
 void loop()
 {
   CountDownTimer(); // run the timer
+  
+  controlMotors();
     
   // this prevents the time from being constantly shown.
   if (TimeHasChanged()) 
   {
-      HourPlusButtonState = digitalRead(7);
-      HourMinusButtonState = digitalRead(13);
+      HourPlusButtonState = digitalRead(buttonPinHourPlus);
+      HourMinusButtonState = digitalRead(buttonPinHourMinus);
   
       // check if the pushbutton is pressed.
       // if it is, the buttonState is HIGH:
@@ -92,39 +133,33 @@ void loop()
      } 
      
      if(isWatering!=true && Stop!=true){
-       analogWrite(3, 0);   
-       lcd.clear();
-       lcd.setCursor(0,0);
-       lcd.print(ShowHours());
-       lcd.print("h:");
-       lcd.print(ShowMinutes());
-       lcd.print("m:");
-       lcd.print(ShowSeconds());
-       lcd.print("s");
-       lcd.setCursor(0,1);
-       lcd.print("Program: ");
-       lcd.print(programActive);
+       analogWrite(speedMotorA, 0);
+       analogWrite(speedMotorB, 0);
+       printTimeRemaining();     
      }
      else if(Stop==true){
        if(isWatering==false){
-         lcd.clear();
-         lcd.setCursor(0,1);
-         lcd.print("Watering...");
+         startWatering();
          isWatering = true;
-         analogWrite(3, 255);   
-         SetTimer(0,0,20);
-         StartTimer();
-         StopTimerAt(0,0,0);
        }
        else {
+         
          //Stop the motor and change direction to avoid continuous spin
-          analogWrite(3, 0); 
+          analogWrite(speedMotorA, 0); 
+          analogWrite(speedMotorB, 0); 
+         
           delay(1000);  
-          digitalWrite(12, LOW); //Establishes forward direction of Channel A
-          analogWrite(3, 255);   
+         
+          digitalWrite(directionMotorA, LOW); 
+          analogWrite(speedMotorA, 255);   
+          digitalWrite(directionMotorB, LOW); 
+          analogWrite(speedMotorB, 255);   
+         
           delay(5000);
-          analogWrite(3, 0); 
-          digitalWrite(12, HIGH); //Establishes forward direction of Channel A
+          analogWrite(speedMotorA, 0); 
+          digitalWrite(directionMotorA, HIGH); 
+          analogWrite(speedMotorB, 0); 
+          digitalWrite(directionMotorB, HIGH); 
           
           isWatering = false;
           lcd.setCursor(0,1);
@@ -144,14 +179,109 @@ void loop()
 }
 
 
+void printTimeRemaining(){
+   lcd.clear();
+   lcd.setCursor(0,0);
+   lcd.print(ShowHours());
+   lcd.print("h:");
+   lcd.print(ShowMinutes());
+   lcd.print("m:");
+   lcd.print(ShowSeconds());
+   lcd.print("s");
+   lcd.setCursor(0,1);
+   lcd.print("Program:");
+   lcd.print(programActive);
+   lcd.print(" - ");
+   if(programActive==1){
+     lcd.print(P1whoWorks[index]);
+   }
+   else {
+     lcd.print(P2whoWorks[index]);
+   }
+}
+
+void startWatering() {
+     lcd.clear();
+     lcd.setCursor(0,0);
+     lcd.print("Watering for ");
+   if(programActive==1){
+     lcd.print(P1wateringDuration[index]);
+     lcd.print("s");
+     String who = P1whoWorks[index];
+     if(who.equals("A,B")){
+       analogWrite(speedMotorA, 255);   
+       analogWrite(speedMotorB, 255);   
+       lcd.setCursor(0,1);
+       lcd.print("Motors: A,B");
+     }
+     else if(who.equals("A")){
+       analogWrite(speedMotorA, 255);   
+       lcd.setCursor(0,1);
+       lcd.print("Motors: A");
+     }
+     else if(who.equals("B")){
+       analogWrite(speedMotorB, 255); 
+       lcd.setCursor(0,1);
+       lcd.print("Motors:B");  
+     }
+     
+     SetTimer(0,0,P1wateringDuration[index]);
+     StartTimer();
+     StopTimerAt(0,0,0);
+   }
+   else {
+     lcd.print(P1wateringDuration[index]);
+     lcd.print("s");
+     String who = P2whoWorks[index];
+     if(who.equals("A,B")){
+       analogWrite(speedMotorA, 255);   
+       analogWrite(speedMotorB, 255);   
+       lcd.setCursor(0,1);
+       lcd.print("Motors: A,B");
+     }
+     else if(who.equals("A")){
+       lcd.setCursor(0,1);
+       lcd.print("Motors: A");
+       analogWrite(speedMotorA, 255);   
+     }
+     else if(who.equals("B")){
+       analogWrite(speedMotorB, 255);   
+       lcd.setCursor(0,1);
+       lcd.print("Motors:B");  
+     }
+     SetTimer(0,0,P2wateringDuration[index]);
+     StartTimer();
+     StopTimerAt(0,0,0);
+   }
+ }
+
+
 void initializeMotors(){
-   //Setup Channel A
-   pinMode(12, OUTPUT); //Initiates Motor Channel A pin
-   pinMode(9, OUTPUT); //Initiates Brake Channel A pin
+
+
+/*
+Function	Channel A	Channel B
+Direction	Digital 12	Digital 13
+Speed (PWM)	Digital 3	Digital 11
+Brake	        Digital 9	Digital 8
+Current Sensing	Analog 0	Analog 1
+*/
   
-   digitalWrite(12, HIGH); //Establishes forward direction of Channel A
-   digitalWrite(9, LOW);   //Disengage the Brake for Channel A
-   analogWrite(3, 0);   //Spins the motor on Channel A at full speed
+   //Setup Channel A
+   pinMode(directionMotorA, OUTPUT); //Initiates Motor Channel A pin
+   pinMode(brakeMotorA, OUTPUT); //Initiates Brake Channel A pin
+  
+   digitalWrite(directionMotorA, HIGH); //Establishes forward direction of Channel A
+   digitalWrite(brakeMotorA, LOW);   //Disengage the Brake for Channel A
+   analogWrite(speedMotorA, 0);   //Spins the motor on Channel A at full speed
+   
+   //Setup Channel B
+   pinMode(directionMotorB, OUTPUT); //Initiates Motor Channel B pin
+   pinMode(brakeMotorB, OUTPUT); //Initiates Brake Channel B pin
+  
+   digitalWrite(directionMotorB, HIGH); //Establishes forward direction of Channel B
+   digitalWrite(brakeMotorB, LOW);   //Disengage the Brake for Channel B
+   analogWrite(speedMotorB, 0);   //Spins the motor on Channel B at full speed
 }
 
 void startCountdown(){
