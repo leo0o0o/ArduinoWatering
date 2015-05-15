@@ -12,32 +12,33 @@ int buttonPinHourMinus = 36;
 int buttonStartMotorA=28;
 int buttonStartMotorB=26;
 
+int ledPinWaterLevel = 41;
+int sensorPin = 40;
+
 //time for watering
 int vectorSize = 3;
-/**
+
 int P1hoursTimer[] = {24, 24, 24};
 int P1minutesTimer[] = {0, 0, 0};
 int P1secondsTimer[] = {0, 0, 0};
-int P1wateringDuration[] = {12,12,12};
-**/
+int P1wateringDuration[] = {20,20,20};
+String P1whoWorks[] = {"A","A","A"};
 
-/**TEST **/
+/**TEST 
 int P1hoursTimer[] = {0, 0, 0};
 int P1minutesTimer[] = {0, 0, 0};
 int P1secondsTimer[] = {50,50,50};
 int P1wateringDuration[] = {20,20,20};
+**/
 
-// 0:both - 1:first - 2:second
-String P1whoWorks[] = {"A,B","A","B"};
-/***/
 
 int P2hoursTimer[] = {48, 48, 48};
 int P2minutesTimer[] = {0, 0, 0};
 int P2secondsTimer[] = {0, 0, 0};
 int P2wateringDuration[] = {20,20,20};
-String P2whoWorks[] = {"A,B","A,B","A,B"};
+String P2whoWorks[] = {"A","A","A"};
 
-int programActive = 2;
+int programActive = 1;
 
 
 int index = 0;
@@ -70,15 +71,14 @@ void setup()
   lcd.begin(16, 2);
   startCountdown();  
   initializeMotors();
+  pinMode(ledPinWaterLevel, OUTPUT);
+  pinMode(sensorPin, INPUT);
 }
 
 void controlMotors(){
   int statusMotorA = digitalRead(buttonStartMotorA);
   int statusMotorB = digitalRead(buttonStartMotorB);
-  Serial.println("status A: ");
-  Serial.println(statusMotorA);
-  Serial.println("status B: ");
-  Serial.println(statusMotorB);
+  
   if(statusMotorA==HIGH){
     analogWrite(speedMotorA, 255);
   }
@@ -92,6 +92,13 @@ void loop()
   CountDownTimer(); // run the timer
   
   controlMotors();
+  
+  if(digitalRead(sensorPin) == LOW ) {
+    digitalWrite(ledPinWaterLevel,HIGH);
+  }
+  if(digitalRead(sensorPin) == HIGH) {
+    digitalWrite(ledPinWaterLevel,LOW);
+  }
     
   // this prevents the time from being constantly shown.
   if (TimeHasChanged()) 
